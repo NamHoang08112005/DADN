@@ -14,6 +14,8 @@ import {
 } from 'chart.js';
 import Sidebar from '../../components/layout/Sidebar';
 import Header from '../../components/layout/Header';
+import BackendConnectionError from '@/components/error/BackendConnectionError';
+import { useBackendConnection } from '@/hooks/useBackendConnection';
 
 ChartJS.register(
     CategoryScale,
@@ -105,7 +107,6 @@ const TemperatureMonitor = () => {
     const [currentTemp, setCurrentTemp] = useState<number>(25);
     const [historicalData, setHistoricalData] = useState<TemperatureData[]>([]);
     const [activeTab, setActiveTab] = useState<'Day' | 'Week' | 'Month' | 'Year'>('Month');
-    const [isBackendConnected, setIsBackendConnected] = useState(false);
     const [stats, setStats] = useState<TemperatureStats>({
         current: 25,
         min: 23,
@@ -115,22 +116,11 @@ const TemperatureMonitor = () => {
         stdDev: 0.5
     });
 
-    // Check if backend is running
-    const checkBackendConnection = async () => {
-        try {
-            const response = await fetch('http://127.0.0.1:8000/sensor/');  // Added trailing slash to avoid redirect
-            if (response.ok) {
-                setIsBackendConnected(true);
-                return true;
-            }
-            setIsBackendConnected(false);
-            return false;
-        } catch (error) {
-            console.error('Backend connection error:', error);
-            setIsBackendConnected(false);
-            return false;
-        }
-    };
+    // Use backend connection hook with auto-retry
+    const { isConnected: isBackendConnected, health, checkConnection } = useBackendConnection({
+        autoRetry: true,
+        retryInterval: 30000 // Retry every 30 seconds
+    });
 
     const fetchLatestTemperature = async () => {
         if (!isBackendConnected) return;
@@ -189,24 +179,17 @@ const TemperatureMonitor = () => {
 
         const initializeData = async () => {
             if (!isComponentMounted) return;
+            if (!isBackendConnected) return;
 
-            const isConnected = await checkBackendConnection();
-            if (isConnected && isComponentMounted) {
-                await fetchHistoricalData();
-                await fetchLatestTemperature();
-            }
+            await fetchHistoricalData();
+            await fetchLatestTemperature();
         };
 
         initializeData();
 
-        // Update data every 5 seconds, but only check connection if we're not already connected
+        // Update data every 5 minutes when backend is connected
         const interval = setInterval(async () => {
-            if (!isComponentMounted) return;
-
-            if (!isBackendConnected) {
-                const isConnected = await checkBackendConnection();
-                if (!isConnected || !isComponentMounted) return;
-            }
+            if (!isComponentMounted || !isBackendConnected) return;
 
             await fetchLatestTemperature();
             await fetchHistoricalData();
@@ -216,30 +199,11 @@ const TemperatureMonitor = () => {
             isComponentMounted = false;
             clearInterval(interval);
         };
-    }, [activeTab, isBackendConnected]); // Added isBackendConnected to dependencies
+    }, [activeTab, isBackendConnected]); // Refetch when backend reconnects or tab changes
 
     // Add a message when backend is not connected
     if (!isBackendConnected) {
-        return (
-            <div className="flex h-screen bg-gray-100">
-                <Sidebar />
-                <div className="flex-1 flex flex-col p-6 overflow-hidden">
-                    <Header />
-                    <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                            <h2 className="text-xl font-semibold text-red-600 mb-2">Cannot Connect to Backend Server</h2>
-                            <p className="text-gray-600">Please make sure the backend server is running at http://127.0.0.1:8000</p>
-                            <button
-                                onClick={checkBackendConnection}
-                                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            >
-                                Retry Connection
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+        return <BackendConnectionError onRetry={checkConnection} />;
     }
 
     const getTemperatureStatus = (temp: number) => {
