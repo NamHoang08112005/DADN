@@ -21,6 +21,20 @@ const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { logout } = useAuth();
 
+  const safeRemoveUser = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (typeof window.localStorage?.removeItem === 'function') {
+      window.localStorage.removeItem('user');
+    }
+
+    if (typeof window.sessionStorage?.removeItem === 'function') {
+      window.sessionStorage.removeItem('user');
+    }
+  };
+
   const isActive = (path: string) => {
     if (path === '/' && pathname === '/') return true;
     if (path !== '/' && pathname.startsWith(path)) return true;
@@ -42,8 +56,7 @@ const Sidebar: React.FC = () => {
     try {
       // Thử trực tiếp xóa storage và redirect để xem có hoạt động không
       console.log('Clearing storage and redirecting manually');
-      localStorage.removeItem('user');
-      sessionStorage.removeItem('user');
+      safeRemoveUser();
       window.location.href = '/about';
     } catch (error) {
       console.error('Error during manual logout:', error);

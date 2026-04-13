@@ -17,6 +17,45 @@ interface AuthContextType {
 // API Base URL
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
+const mapNetworkError = (error: unknown): string => {
+  const raw = error instanceof Error ? error.message : String(error);
+  const lowered = raw.toLowerCase();
+
+  if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
+    return 'Khong the ket noi toi backend. Hay dam bao backend dang chay tai http://127.0.0.1:8000.';
+  }
+
+  if (lowered.includes('getaddrinfo failed') || lowered.includes('name resolution')) {
+    return 'Backend khong ket noi duoc toi dich vu database (loi DNS/network). Vui long kiem tra internet va DNS.';
+  }
+
+  return raw;
+};
+
+const getStorageValue = (storage: Storage | undefined, key: string) => {
+  if (!storage || typeof storage.getItem !== 'function') {
+    return null;
+  }
+
+  return storage.getItem(key);
+};
+
+const setStorageValue = (storage: Storage | undefined, key: string, value: string) => {
+  if (!storage || typeof storage.setItem !== 'function') {
+    return;
+  }
+
+  storage.setItem(key, value);
+};
+
+const removeStorageValue = (storage: Storage | undefined, key: string) => {
+  if (!storage || typeof storage.removeItem !== 'function') {
+    return;
+  }
+
+  storage.removeItem(key);
+};
+
 // Create the context with default values
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -38,7 +77,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const checkAuthStatus = async () => {
       try {
         // Check for user data in localStorage first, then sessionStorage
-        const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+        const storedUser =
+          getStorageValue(window.localStorage, 'user') ||
+          getStorageValue(window.sessionStorage, 'user');
         console.log('Checking auth status, stored user:', storedUser);
         
         if (storedUser) {
@@ -49,8 +90,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         // If user data is invalid, clear it
         console.error('Error checking auth status:', error);
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('user');
+        removeStorageValue(window.localStorage, 'user');
+        removeStorageValue(window.sessionStorage, 'user');
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -73,6 +114,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Request failed with status ${response.status}`);
+      }
       
       if (data.message !== "Login successful") {
         throw new Error(data.message || 'Authentication failed');
@@ -88,18 +133,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Save user data to localStorage if rememberMe is true, otherwise to sessionStorage
       if (rememberMe) {
-        localStorage.setItem('user', JSON.stringify(userData));
+        setStorageValue(window.localStorage, 'user', JSON.stringify(userData));
         console.log('Saved user data to localStorage:', userData);
       } else {
-        sessionStorage.setItem('user', JSON.stringify(userData));
+        setStorageValue(window.sessionStorage, 'user', JSON.stringify(userData));
         console.log('Saved user data to sessionStorage:', userData);
       }
       
       setUser(userData);
       console.log('User logged in:', userData);
     } catch (error) {
-      // console.error('Login error:', error);
-      throw error;
+      throw new Error(mapNetworkError(error));
     } finally {
       setIsLoading(false);
     }
@@ -124,6 +168,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Request failed with status ${response.status}`);
+      }
       
       if (data.error) {
         throw new Error(data.error);
@@ -132,8 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Không cần chuyển hướng ở đây, để RegisterForm xử lý
       console.log('Registration successful');
     } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
+      throw new Error(mapNetworkError(error));
     } finally {
       setIsLoading(false);
     }
@@ -142,8 +189,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Logout function 
   const logout = async () => {
     console.log('Logout function called');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('user');
+    removeStorageValue(window.localStorage, 'user');
+    removeStorageValue(window.sessionStorage, 'user');
     setUser(null);
     router.push('/about');
   };
