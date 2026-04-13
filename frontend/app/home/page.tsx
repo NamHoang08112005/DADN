@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import React, { useState } from 'react'; // Thêm useState nếu cần
+import React, { useState } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import Header from '../../components/layout/Header';
 import WelcomeCard from '../../components/dashboard/WelcomeCard';
@@ -11,11 +11,15 @@ import FanControl from '../../components/dashboard/FanControl';
 import { useSensorData } from '../../hooks/useSensorData';
 import { useDeviceControl } from '../../hooks/useDeviceControl';
 import { useWeather } from '../../hooks/useWeather';
+import useAuth from '../../hooks/useAuth';
 
 export default function Home() {
   const { data, loading: dataLoading } = useSensorData('Month');
   const { devices, toggleDevice, loading: devicesLoading } = useDeviceControl();
   const { weather, loading: weatherLoading } = useWeather();
+  const { user } = useAuth();
+
+  const displayName = user?.name || user?.Name || user?.username || 'User';
   
   const [fanSpeed, setFanSpeed] = useState(50);
   const handleFanSpeedChange = (speed: number) => {
@@ -37,7 +41,7 @@ export default function Home() {
         <div className="grid grid-cols-4 gap-6">
           {/* Left column (3/4 width) */}
           <div className="col-span-3 space-y-6">
-            <WelcomeCard userName="Phu" weatherData={weather} />
+            <WelcomeCard userName={displayName} weatherData={weather} />
             <SensorsChart data={data} />
           </div>
           
