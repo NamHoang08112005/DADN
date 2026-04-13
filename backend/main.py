@@ -7,12 +7,15 @@ from contextlib import asynccontextmanager
 from adafruitConnection import run_mqtt_thread
 import os
 from supabase import create_client, Client
+from dotenv import load_dotenv
 import threading
 from threading import Lock
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from datetime import datetime, timedelta, timezone
+
+load_dotenv()
 
 class ThresholdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -60,9 +63,12 @@ async def lifespan(app: FastAPI):
     # A dedicated thread to constantly received new data from adafruit
     run_mqtt_thread()
 
-    # Set up connection to Cloud Database
-    url: str = "https://uptilkatqzrxvsqzcemx.supabase.co"
-    key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwdGlsa2F0cXpyeHZzcXpjZW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NjkyOTMsImV4cCI6MjA2MTE0NTI5M30.XrdLClY2uTnKp9htHIU1dae2WdOXVbLVD5GwP0lW7mA"
+    # Set up connection to Supabase
+    url: str = os.getenv("SUPABASE_URL", "https://uptilkatqzrxvsqzcemx.supabase.co")
+    key: str = os.getenv(
+        "SUPABASE_KEY",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwdGlsa2F0cXpyeHZzcXpjZW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NjkyOTMsImV4cCI6MjA2MTE0NTI5M30.XrdLClY2uTnKp9htHIU1dae2WdOXVbLVD5GwP0lW7mA",
+    )
 
     supabase: Client = create_client(url, key)
     app.state.db = supabase
