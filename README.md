@@ -102,6 +102,13 @@ Sửa tên file backend/.env.example -> .env
 Bổ sung thông tin trong file .env
 
 
+### Chuẩn bị Database (Supabase PostgreSQL)
+
+1. Tạo một project Supabase mới.
+2. Mở SQL Editor trong Supabase.
+3. Chạy toàn bộ file `DoAnDaNganhDBSchema.postgres.sql` để tạo bảng.
+4. Kiểm tra lại bảng users:
+
 ### Backend Setup:
 
 ```bash
