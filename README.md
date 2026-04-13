@@ -98,6 +98,9 @@ This report provides a comprehensive overview of the **Yolo:Home** project, deta
 ---
 
 ## 🛠️ Setting Up the Environment
+Sửa tên file backend/.env.example -> .env
+Bổ sung thông tin trong file .env
+
 
 ### Backend Setup:
 
