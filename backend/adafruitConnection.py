@@ -82,6 +82,59 @@ def run_mqtt_thread():
     mqtt_thread = threading.Thread(target=start_mqtt, daemon=True)
     mqtt_thread.start()
 
+def check_adafruit_connection():
+    """
+    Kiểm tra xem Adafruit có kết nối được không hay bị chặn
+    Returns:
+        dict: {
+            'connected': bool,
+            'status': str,
+            'error': str (nếu có)
+        }
+    """
+    try:
+        if mqtt_client is None:
+            return {
+                'connected': False,
+                'status': 'MQTT client not initialized',
+                'error': 'mqtt_client is None'
+            }
+        
+        # Kiểm tra xem mqtt_client có is_connected() method không
+        if hasattr(mqtt_client, '_client') and mqtt_client._client:
+            is_connected = mqtt_client._client.is_connected()
+            if is_connected:
+                return {
+                    'connected': True,
+                    'status': 'Connected to Adafruit IO',
+                    'error': None
+                }
+            else:
+                return {
+                    'connected': False,
+                    'status': 'MQTT client disconnected',
+                    'error': 'Connection lost or not established'
+                }
+        else:
+            return {
+                'connected': False,
+                'status': 'MQTT client not ready',
+                'error': 'Internal MQTT client not initialized'
+            }
+    except Exception as e:
+        return {
+            'connected': False,
+            'status': 'Connection check failed',
+            'error': str(e)
+        }
+
+def is_adafruit_connected():
+    """
+    Simple boolean check - returns True nếu Adafruit đã kết nối được
+    """
+    result = check_adafruit_connection()
+    return result['connected']
+
 # if __name__ == "__main__":
 #     # Start MQTT listener thread
 #     # Thread này dùng đề listen feedback từ Adafruit

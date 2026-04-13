@@ -124,6 +124,25 @@ async def root():
     Root endpoint to check API status.
     """
     return { "Hello World" }
+
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint to diagnose backend and Adafruit connection issues
+    """
+    from adafruitConnection import check_adafruit_connection, is_adafruit_connected
+    
+    adafruit_status = check_adafruit_connection()
+    
+    return {
+        "backend": "running",
+        "adafruit_io": {
+            "connected": adafruit_status["connected"],
+            "status": adafruit_status["status"],
+            "error": adafruit_status["error"]
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
     
 
 # @app.websocket("/notifications/ws")
