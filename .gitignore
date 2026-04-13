@@ -23,6 +23,9 @@
 # misc
 .DS_Store
 *.pem
+.node-localstorage
+.node-localstorage-shm
+.node-localstorage-wal
 
 # debug
 npm-debug.log*
