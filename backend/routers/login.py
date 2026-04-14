@@ -199,6 +199,7 @@ async def face_login(request: Request, image: UploadFile = File(...)):
         if best_index < 0 or best_distance is None:
             return {
                 "authenticated": False,
+                "reason": "no_match",
                 "message": "No matching user found",
                 "vector_column": cache_col,
                 "embedding_size": FACE_EMBEDDING_SIZE,
@@ -206,13 +207,26 @@ async def face_login(request: Request, image: UploadFile = File(...)):
             }
 
         matched_user = metadata[best_index]
+        matched_user_id = matched_user.get("User_Id")
         authenticated = best_distance <= FACE_MATCH_DISTANCE_THRESHOLD
 
+        matched_user_profile = None
+        if matched_user_id is not None:
+            try:
+                user_result = supabase.table("users").select("*") \
+                    .eq("User_Id", matched_user_id) \
+                    .limit(1) \
+                    .execute()
+                if user_result.data:
+                    matched_user_profile = user_result.data[0]
+            except Exception:
+                matched_user_profile = None
+
         stored_to_db = False
-        if authenticated and matched_user.get("User_Id") is not None:
+        if authenticated and matched_user_id is not None:
             try:
                 supabase.table("users").update({cache_col: embedding.tolist()}) \
-                    .eq("User_Id", matched_user.get("User_Id")) \
+                    .eq("User_Id", matched_user_id) \
                     .execute()
                 stored_to_db = True
                 refresh_user_vector_cache(request.app, supabase)
@@ -221,15 +235,21 @@ async def face_login(request: Request, image: UploadFile = File(...)):
 
         return {
             "authenticated": authenticated,
-            "matched_user_id": matched_user.get("User_Id"),
+            "reason": "matched" if authenticated else "distance_above_threshold",
+            "matched_user_id": matched_user_id,
             "matched_name": matched_user.get("Name"),
+            "user": matched_user_profile,
             "distance_score": best_distance,
             "threshold": FACE_MATCH_DISTANCE_THRESHOLD,
             "vector_column": cache_col,
             "embedding_size": FACE_EMBEDDING_SIZE,
             "embedding": embedding.tolist(),
             "stored_to_db": stored_to_db,
-            "message": "Đã xác thực" if authenticated else "Khuôn mặt chưa khớp với dữ liệu đã lưu",
+            "message": (
+                "Đã xác thực"
+                if authenticated
+                else f"Khuon mat chua khop (distance={best_distance:.4f}, threshold={FACE_MATCH_DISTANCE_THRESHOLD:.4f})"
+            ),
         }
     except HTTPException:
         raise

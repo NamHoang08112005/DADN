@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
+  signInWithUser: (rawUser: Partial<User> & Record<string, any>, rememberMe?: boolean) => Promise<void>;
   register: (username: string, password: string, email: string, dateOfBirth: Date) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -62,6 +63,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isAuthenticated: false,
   login: async () => {},
+  signInWithUser: async () => {},
   register: async () => {},
   logout: async () => {},
 });
@@ -101,6 +103,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuthStatus();
   }, []);
 
+  const mapToFrontendUser = (rawUser: Partial<User> & Record<string, any>): User => {
+    const resolvedUserId = Number(rawUser.User_Id ?? rawUser.id);
+    if (!Number.isFinite(resolvedUserId)) {
+      throw new Error('Invalid user payload: missing User_Id');
+    }
+
+    return {
+      ...rawUser,
+      User_Id: resolvedUserId,
+      username: rawUser.username || `user_${resolvedUserId}`,
+      id: resolvedUserId.toString(),
+      name: rawUser.Name || rawUser.name,
+      role: rawUser.role || 'user',
+    };
+  };
+
+  const persistSignedInUser = (userData: User, rememberMe = false) => {
+    if (rememberMe) {
+      setStorageValue(window.localStorage, 'user', JSON.stringify(userData));
+      removeStorageValue(window.sessionStorage, 'user');
+      console.log('Saved user data to localStorage:', userData);
+    } else {
+      setStorageValue(window.sessionStorage, 'user', JSON.stringify(userData));
+      removeStorageValue(window.localStorage, 'user');
+      console.log('Saved user data to sessionStorage:', userData);
+    }
+
+    setUser(userData);
+    console.log('User logged in:', userData);
+  };
+
+  const signInWithUser = async (rawUser: Partial<User> & Record<string, any>, rememberMe = false) => {
+    const userData = mapToFrontendUser(rawUser);
+    persistSignedInUser(userData, rememberMe);
+  };
+
   // Login function - connect to backend API
   const login = async (username: string, password: string, rememberMe = false) => {
     setIsLoading(true);
@@ -123,25 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(data.message || 'Authentication failed');
       }
       
-      // Convert backend user model to frontend model
-      const userData: User = {
-        ...data.user,
-        id: data.user.User_Id?.toString(),
-        name: data.user.Name,
-        role: 'user', // Default role
-      };
-
-      // Save user data to localStorage if rememberMe is true, otherwise to sessionStorage
-      if (rememberMe) {
-        setStorageValue(window.localStorage, 'user', JSON.stringify(userData));
-        console.log('Saved user data to localStorage:', userData);
-      } else {
-        setStorageValue(window.sessionStorage, 'user', JSON.stringify(userData));
-        console.log('Saved user data to sessionStorage:', userData);
-      }
-      
-      setUser(userData);
-      console.log('User logged in:', userData);
+      await signInWithUser(data.user, rememberMe);
     } catch (error) {
       throw new Error(mapNetworkError(error));
     } finally {
@@ -199,6 +219,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading,
     isAuthenticated: !!user,
     login,
+    signInWithUser,
     register,
     logout,
   };
