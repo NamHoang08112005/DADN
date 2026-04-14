@@ -74,6 +74,19 @@ async def lifespan(app: FastAPI):
     app.state.db = supabase
     print("Finish set up connection with Supabase DB.")
 
+    # Keep user vectors in RAM for fast face-matching flows.
+    app.state.user_vectors_cache = []
+    app.state.user_vectors_column = None
+    app.state.user_vectors_loaded_at = None
+    try:
+        login.refresh_user_vector_cache(app, supabase)
+        print(
+            f"Loaded {len(app.state.user_vectors_cache)} user vectors into RAM "
+            f"(column: {app.state.user_vectors_column})."
+        )
+    except Exception as e:
+        print(f"Could not preload user vectors into RAM: {e}")
+
     # Set up max action threshold + Lock
     app.state.max_request_counter = 0
     app.state.max_request_lock = Lock()
