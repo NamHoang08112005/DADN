@@ -10,8 +10,12 @@ create table if not exists public.users (
     email text,
     "Name" text,
     date_of_birth date,
-    social_security_number text
+    social_security_number text,
+    face_vector jsonb
 );
+
+alter table if exists public.users
+    add column if not exists face_vector jsonb;
 
 create table if not exists public.devicesensortype (
     serial_number text primary key,
