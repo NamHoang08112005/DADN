@@ -34,7 +34,7 @@ backend/
 ## Getting Started
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.11 or 3.12 (recommended)
 - Adafruit IO account
 - Supabase project
 
@@ -56,10 +56,21 @@ The backend reads these values at startup, so do not commit real credentials to 
    ```
    cd backend
    ```
-3. Install dependencies:
+3. Create and activate a virtual environment with Python 3.12 (Windows PowerShell):
+   ```
+   py -3.12 -m venv ..\.venv
+   ..\.venv\Scripts\Activate.ps1
+   ```
+4. Upgrade packaging tools:
+   ```
+   python -m pip install --upgrade pip setuptools wheel
+   ```
+5. Install dependencies:
    ```
    pip install -r requirements.txt
    ```
+
+If you use Python 3.14, `numpy` can fail with `metadata-generation-failed` because compatible wheels may not be available yet.
 
 ### Running the Server
 To start the development server:
