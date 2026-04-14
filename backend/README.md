@@ -50,44 +50,53 @@ SUPABASE_KEY=your-supabase-anon-key
 
 The backend reads these values at startup, so do not commit real credentials to git.
 
-### Installation
-1. Clone the repository
-2. Navigate to the backend directory:
-   ```
+### Step-by-step: Run the Backend Server (Windows PowerShell)
+
+1. Open PowerShell and move to the backend folder:
+   ```powershell
    cd backend
    ```
-3. Create and activate a virtual environment with Python 3.12 (Windows PowerShell):
-   ```
+
+2. Create the virtual environment (first time only):
+   ```powershell
    py -3.12 -m venv ..\.venv
+   ```
+
+3. Activate the virtual environment (every time you open a new terminal):
+   ```powershell
    ..\.venv\Scripts\Activate.ps1
    ```
-4. Upgrade packaging tools:
-   ```
+
+4. Upgrade packaging tools (recommended after activation):
+   ```powershell
    python -m pip install --upgrade pip setuptools wheel
    ```
+
 5. Install dependencies:
+   ```powershell
+   python -m pip install -r requirements.txt
    ```
-   pip install -r requirements.txt
+
+6. Start the server with the recommended script:
+   ```powershell
+   .\run.ps1
+   ```
+
+7. Open the API in your browser:
+   ```
+   http://127.0.0.1:8000
    ```
 
 If you use Python 3.14, `numpy` can fail with `metadata-generation-failed` because compatible wheels may not be available yet.
 
-### Running the Server
+### Alternative Manual Start
+If needed, you can run the app manually after environment activation:
 
-#### Option 1: Using the run script (Recommended - Windows PowerShell)
 ```powershell
-.\run.ps1
-```
-This script automatically handles the OpenMP library conflict that can occur with NumPy and PyTorch.
-
-#### Option 2: Manual startup
-```
 fastapi dev main.py
 ```
 
-**Note**: If you encounter the OpenMP error (`OMP: Error #15`), use Option 1 (the `run.ps1` script) instead.
-
-The API will be available at http://127.0.0.1:8000
+If you encounter the OpenMP error (`OMP: Error #15`), use `.\run.ps1` instead of manual startup.
 
 ## Troubleshooting
 
@@ -109,3 +118,30 @@ The API will be available at http://127.0.0.1:8000
    ```
 
 The `run.ps1` script automatically handles this configuration, so it's the easiest solution.
+
+### ModuleNotFoundError: No module named uvicorn
+**Error**: `C:\Users\...\python.exe: No module named uvicorn`
+
+**Cause**: You are running the backend with a different Python interpreter than the one where `requirements.txt` was installed.
+
+**Solution**:
+1. Activate the project virtual environment:
+   ```powershell
+   ..\.venv\Scripts\Activate.ps1
+   ```
+
+2. Reinstall dependencies in the active environment:
+   ```powershell
+   python -m pip install -r requirements.txt
+   ```
+
+3. Start the backend again:
+   ```powershell
+   .\run.ps1
+   ```
+
+4. Verify interpreter and package if needed:
+   ```powershell
+   python -c "import sys; print(sys.executable)"
+   python -m pip show uvicorn
+   ```
