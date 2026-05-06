@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from adafruitConnection import get_aio, get_mqtt, AIO_FEED_IDS
 from model import FanSpeed
 
@@ -9,11 +9,16 @@ def get_fan_status():
     return {"status": "Fan is working"}
 
 @router.post("/fan/off")
-async def turn_off_fan():
+async def turn_off_fan(request: Request):
     try:
         mqtt_client = get_mqtt()
         print(f"Publishing 0 to {AIO_FEED_IDS[1]}")
         mqtt_client.publish( AIO_FEED_IDS[1] , 0)
+
+        # ✅ Update state
+        with request.app.state.fan_speed_lock:
+            request.app.state.current_fan_speed = 0
+
         return { "message": "Success" }
     except Exception as e:
         return {"error": str(e)}
@@ -21,11 +26,16 @@ async def turn_off_fan():
 
 
 @router.post("/fan/on")
-async def turn_on_fan(data: FanSpeed):
+async def turn_on_fan(data: FanSpeed, request: Request):
     try:
         mqtt_client = get_mqtt()
         print(f"Publishing {data.speed} to {AIO_FEED_IDS[1]}")
         mqtt_client.publish(AIO_FEED_IDS[1], data.speed)
+
+        # ✅ Update global state
+        with request.app.state.fan_speed_lock:
+            request.app.state.current_fan_speed = data.speed
+
         return {"message": f"Fan turned on at speed {data.speed}"}
     except Exception as e:
         return {"error": str(e)}

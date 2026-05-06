@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
-from routers import fan, light, sensor, login, activitylog
+from routers import fan, light, sensor, login, activitylog, gesture
 from contextlib import asynccontextmanager
 from adafruitConnection import run_mqtt_thread
 import os
@@ -87,11 +87,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Could not preload user vectors into RAM: {e}")
 
+    # Keep gesture mappings in RAM for fast gesture mapping
+    app.state.gesture_mapping_cache = {}
+    app.state.gesture_mapping_loaded_at = None
+    app.state.gesture_mapping_lock = Lock()
+    gesture.refresh_gesture_mapping_cache(app, supabase)
+
     # Set up max action threshold + Lock
     app.state.max_request_counter = 0
     app.state.max_request_lock = Lock()
     app.state.max_limit = 25
     app.state.cooldown_until = None
+    
+    app.state.current_fan_speed = 50
+    app.state.fan_speed_lock = Lock()
 
     # A dedicated thread that constantly checking on the threshold and reset it
     threading.Thread(target=check_to_reset, args = (app,), daemon=True).start()
@@ -130,6 +139,7 @@ app.include_router(light.router)
 app.include_router(sensor.router)
 app.include_router(login.router)
 app.include_router(activitylog.router)
+app.include_router(gesture.router)
 
 @app.get("/")
 async def root():

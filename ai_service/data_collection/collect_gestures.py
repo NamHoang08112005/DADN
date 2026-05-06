@@ -23,7 +23,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 SAVE_RAW = True   # keep raw landmarks (recommended)
 
-# Key → gesture mapping
+# Key -> gesture mapping
 GESTURE_KEYS = {
     ord('0'): "open_palm",       # turn on all
     ord('1'): "fist",            # turn off all

@@ -19,6 +19,7 @@ from utils.mediapipe_utils import (
 )
 from utils.preprocessing import preprocess
 from mqtt.publisher import MQTTPublisher
+from inference.gesture_commit import send_gesture
 
 
 # ==============================
@@ -153,8 +154,11 @@ while True:
             "timestamp": int(current_time)
         }
 
-        mqtt_client.publish_gesture(payload, MQTT_TOPIC)
-        print(f"📤 Publishing -> {MQTT_TOPIC}: {payload}")
+        #mqtt_client.publish_gesture(payload, MQTT_TOPIC)
+        #print(f"📤 Publishing -> {MQTT_TOPIC}: {payload}")
+
+        print("🎯 Detected:", stable_gesture)
+        send_gesture(payload)
 
         last_sent_time = current_time
         last_sent_gesture = stable_gesture
