@@ -64,10 +64,10 @@ async def lifespan(app: FastAPI):
     run_mqtt_thread()
 
     # Set up connection to Supabase
-    url: str = os.getenv("SUPABASE_URL", "https://uptilkatqzrxvsqzcemx.supabase.co")
+    url: str = os.getenv("SUPABASE_URL", "")
     key: str = os.getenv(
         "SUPABASE_KEY",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwdGlsa2F0cXpyeHZzcXpjZW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NjkyOTMsImV4cCI6MjA2MTE0NTI5M30.XrdLClY2uTnKp9htHIU1dae2WdOXVbLVD5GwP0lW7mA",
+        ""
     )
 
     supabase: Client = create_client(url, key)
