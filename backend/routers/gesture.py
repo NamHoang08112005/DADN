@@ -4,6 +4,7 @@ from adafruitConnection import get_mqtt, AIO_FEED_IDS
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from model import GestureMappingCreate, GestureMappingUpdate
+from datetime import datetime
 
 
 router = APIRouter(prefix="/gesture", tags=["Gesture"])
@@ -72,6 +73,19 @@ async def execute_gesture(data: dict, request: Request):
     mqtt_client = get_mqtt()
 
     try:
+        # After validation passes
+        timestamp = datetime.utcnow().isoformat()
+
+        #await request.app.state.ws_manager.broadcast({
+        #    "type": "gesture_log",
+        #    "gesture": gesture,
+        #    "confidence": confidence,
+        #    "timestamp": timestamp,
+        #    "status": "processing"
+        #})
+
+        executed_actions = list()
+
         for action in actions:
             action_type = action.get("action_type")
             value = action.get("action_value")
@@ -84,11 +98,38 @@ async def execute_gesture(data: dict, request: Request):
                 print(f"[GESTURE] Fan ON -> {speed}") 
                 mqtt_client.publish(AIO_FEED_IDS[1], speed)
 
+                await request.app.state.ws_manager.broadcast({
+                    "type": "fan_update",
+                    "speed": speed
+                })
+
+                # ✅ Update state
+                with request.app.state.fan_speed_lock:
+                    request.app.state.current_fan_speed = speed
+
+                executed_actions.append({
+                    "action": "fan_on",
+                    "value": speed
+                })
+
             elif action_type == "fan_off":
                 with request.app.state.fan_speed_lock:
                     request.app.state.current_fan_speed = 0
                 print("[GESTURE] Fan OFF")
                 mqtt_client.publish(AIO_FEED_IDS[1], 0)
+
+                await request.app.state.ws_manager.broadcast({
+                    "type": "fan_update",
+                    "speed": 0
+                })
+
+                with request.app.state.fan_speed_lock:
+                    request.app.state.current_fan_speed = 0
+
+                executed_actions.append({
+                    "action": "fan_off",
+                    "value": 0
+                })
 
             elif action_type == "fan_speed_up":
                 with request.app.state.fan_speed_lock:
@@ -99,6 +140,19 @@ async def execute_gesture(data: dict, request: Request):
                 print(f"[GESTURE] Fan speed UP -> {new_speed}")
                 mqtt_client.publish(AIO_FEED_IDS[1], new_speed)
 
+                await request.app.state.ws_manager.broadcast({
+                    "type": "fan_update",
+                    "speed": new_speed
+                })
+
+                with request.app.state.fan_speed_lock:
+                    request.app.state.current_fan_speed = new_speed
+
+                executed_actions.append({
+                    "action": "fan_speed_up",
+                    "value": new_speed
+                })
+
             elif action_type == "fan_speed_down":
                 with request.app.state.fan_speed_lock:
                     current = request.app.state.current_fan_speed
@@ -108,6 +162,19 @@ async def execute_gesture(data: dict, request: Request):
                 print(f"[GESTURE] Fan speed DOWN -> {new_speed}")
                 mqtt_client.publish(AIO_FEED_IDS[1], new_speed)
 
+                await request.app.state.ws_manager.broadcast({
+                    "type": "fan_update",
+                    "speed": new_speed
+                })
+
+                with request.app.state.fan_speed_lock:
+                    request.app.state.current_fan_speed = new_speed
+
+                executed_actions.append({
+                    "action": "fan_speed_down",
+                    "value": new_speed
+                })
+
             # ==============================
             # LIGHT CONTROL
             # ==============================
@@ -115,14 +182,57 @@ async def execute_gesture(data: dict, request: Request):
                 print("[GESTURE] Light ON")
                 mqtt_client.publish(AIO_FEED_IDS[4], 1)
 
+                await request.app.state.ws_manager.broadcast({
+                    "type": "led_update",
+                    "is_on": True
+                })
+
+                with request.app.state.led_lock:
+                    request.app.state.current_led_state["is_on"] = True
+
+                executed_actions.append({
+                    "action": "light_on",
+                    "value": True
+                })
+
             elif action_type == "light_off":
                 print("[GESTURE] Light OFF")
                 mqtt_client.publish(AIO_FEED_IDS[4], 0)
+
+                await request.app.state.ws_manager.broadcast({
+                    "type": "led_update",
+                    "is_on": False
+                })
+
+                with request.app.state.led_lock:
+                    request.app.state.current_led_state["is_on"] = False
+
+                executed_actions.append({
+                    "action": "light_off",
+                    "value": False
+                })
 
             elif action_type == "color_change":
                 if value:
                     print(f"[GESTURE] Color -> {value}")
                     mqtt_client.publish(AIO_FEED_IDS[0], value)
+
+        await request.app.state.ws_manager.broadcast({
+            "type": "gesture_log",
+            "gesture": gesture,
+            "confidence": confidence,
+            "actions": executed_actions,
+            "timestamp": timestamp,
+            "status": "executed"
+        })
+
+        await request.app.state.db.table("gesturelog").insert({
+            "gesture": gesture,
+            "confidence": confidence,
+            "actions": executed_actions,
+            "status": "executed",
+            "timestamp": timestamp
+        }).execute()
 
         return {
             "message": "Executed",

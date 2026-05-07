@@ -6,7 +6,7 @@ import joblib
 from collections import deque
 
 import cv2
-import paho.mqtt.client as mqtt
+#import paho.mqtt.client as mqtt
 
 # Utils
 from utils.mediapipe_utils import (
@@ -20,6 +20,7 @@ from utils.mediapipe_utils import (
 from utils.preprocessing import preprocess
 from mqtt.publisher import MQTTPublisher
 from inference.gesture_commit import send_gesture
+import threading
 
 
 # ==============================
@@ -62,14 +63,14 @@ label_encoder = joblib.load(ENCODER_PATH)
 # client = mqtt.Client()
 # client.username_pw_set(MQTT_USERNAME, MQTT_KEY)
 # client.connect(MQTT_BROKER, MQTT_PORT, 60)
-mqtt_client = MQTTPublisher(
-    broker=MQTT_BROKER,
-    port=MQTT_PORT,
-    username=MQTT_USERNAME,
-    key=MQTT_KEY,
-    default_topic=MQTT_TOPIC
-)
-mqtt_client.connect()
+#mqtt_client = MQTTPublisher(
+#    broker=MQTT_BROKER,
+#    port=MQTT_PORT,
+#    username=MQTT_USERNAME,
+#    key=MQTT_KEY,
+#    default_topic=MQTT_TOPIC
+#)
+#mqtt_client.connect()
 
 
 # ==============================
@@ -85,6 +86,8 @@ cap = init_camera()
 pred_queue = deque(maxlen=SMOOTHING_WINDOW)
 last_sent_time = 0
 last_sent_gesture = None
+last_sent_times = {}
+REPEAT_DELAY = 2  # seconds
 
 
 # a window of 5 to 15 frames is the "sweet spot" for responsiveness versus stability
@@ -132,6 +135,11 @@ while True:
         # Add to smoothing queue
         if confidence > CONFIDENCE_THRESHOLD:
             pred_queue.append(gesture_name)
+        else:
+            pred_queue.clear()
+
+    else:
+        pred_queue.clear()
 
     # ==============================
     # STABLE PREDICTION
@@ -145,23 +153,33 @@ while True:
 
     if (
         stable_gesture is not None and
-        (current_time - last_sent_time > COOLDOWN_TIME) and
-        stable_gesture != last_sent_gesture
+        (current_time - last_sent_time > COOLDOWN_TIME) 
+        #and stable_gesture != last_sent_gesture
     ):
-        payload = {
-            "gesture": str(stable_gesture),
-            "confidence": float(confidence),
-            "timestamp": int(current_time)
-        }
+        last_time = last_sent_times.get(stable_gesture, 0)
 
-        #mqtt_client.publish_gesture(payload, MQTT_TOPIC)
-        #print(f"📤 Publishing -> {MQTT_TOPIC}: {payload}")
+        if current_time - last_time > REPEAT_DELAY:
+            payload = {
+                "gesture": str(stable_gesture),
+                "confidence": float(confidence),
+                "timestamp": int(current_time)
+            }
 
-        print("🎯 Detected:", stable_gesture)
-        send_gesture(payload)
+            #mqtt_client.publish_gesture(payload, MQTT_TOPIC)
+            #print(f"📤 Publishing -> {MQTT_TOPIC}: {payload}")
 
-        last_sent_time = current_time
-        last_sent_gesture = stable_gesture
+            print("🎯 Detected:", stable_gesture)
+
+            # send_gesture(payload)
+            threading.Thread(
+                target=send_gesture,
+                args=(payload,),
+                daemon=True
+            ).start()
+
+            last_sent_time = current_time
+            last_sent_times[stable_gesture] = current_time
+        #last_sent_gesture = stable_gesture
 
     # ==============================
     # DISPLAY
@@ -172,7 +190,7 @@ while True:
     cv2.imshow("Gesture Control", frame)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
-        mqtt_client.auto_reconnect = False
+        #mqtt_client.auto_reconnect = False
         break
 
 
@@ -181,4 +199,4 @@ while True:
 # ==============================
 cap.release()
 cv2.destroyAllWindows()
-mqtt_client.disconnect()
+#mqtt_client.disconnect()

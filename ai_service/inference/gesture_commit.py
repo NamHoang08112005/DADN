@@ -32,7 +32,7 @@ def send_gesture(gesture_description):
         response = requests.post(
             f"{BACKEND_URL}/gesture/execute",
             json=gesture_description,
-            timeout=1
+            timeout=3
         )
 
         if response.status_code != 200:

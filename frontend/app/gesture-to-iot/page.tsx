@@ -10,7 +10,13 @@ import {
     updateMapping,
     deleteMapping,
     ActionType,
+    GestureAction,
+    GestureLog
 } from '../../models/gestureMapping';
+import { getSocket, subscribe } from "@/lib/socket";
+
+// API Base URL
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 const GESTURES = [
     'open_palm',
@@ -45,6 +51,8 @@ export default function GestureConfigPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [message, setMessage] = useState('');
 
+    const [logs, setLogs] = useState<GestureLog[]>([]);
+
     // =========================
     // Load mappings
     // =========================
@@ -63,6 +71,48 @@ export default function GestureConfigPage() {
 
     useEffect(() => {
         loadMappings();
+    }, []);
+
+    useEffect(() => {
+        getSocket(); // ensure socket initialized
+ 
+        const unsubscribe = subscribe((data) => {
+            if (data.type === "gesture_log") {
+                setLogs((prev) => [
+                    {
+                        gesture: data.gesture,
+                        confidence: data.confidence,
+                        actions: data.actions || [],
+                        timestamp: data.timestamp,
+                        status: data.status
+                    },
+                    ...prev.slice(0, 19)
+                ]);
+            }
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    // fetch logs on page load
+    useEffect(() => {
+        const fetchLogs = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/activitylog/gestures`);
+                const data = await res.json();
+
+	    // {
+                // "data": []
+            // }
+                if (data.data) {
+                    setLogs(data.data);
+                }
+            } catch (err) {
+                console.error("Failed to fetch gesture logs:", err);
+            }
+        };
+
+        fetchLogs();
     }, []);
 
     // =========================
@@ -144,13 +194,19 @@ export default function GestureConfigPage() {
 
     return (
         <div className="flex min-h-screen bg-gray-100">
+
             <Sidebar />
-            <div className="flex-1 p-6">
+
+            <div className="flex-1 flex p-6 flex-col p-6 space-y-6">
+
+	        {/* Shared header */}
                 <Header />
 
+		{/* Page title */}
                 <h1 className="text-2xl font-bold mb-6 text-black">
                     Gesture Configuration
                 </h1>
+
 
 		{/* ================= FORM ================= */}
 		<div className="bg-white p-6 rounded-xl shadow mb-6 border">
@@ -352,7 +408,71 @@ export default function GestureConfigPage() {
 			</div>
 		    )}
 		</div>
-            </div>
+
+	    {/* Log detected gestures */}
+            <div className="bg-white p-6 rounded-xl shadow border">
+
+	        <h2 className="text-xl font-semibold mb-6 text-black">
+		    Gesture Logs
+	        </h2>
+
+	        {logs.length === 0 ? (
+		    <p className="text-gray-500 text-sm">
+		        No gestures detected yet...
+		    </p>
+	        ) : (
+		    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+		        {logs.map((log, index) => (
+			    <div
+			        key={index}
+			        className="border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white"
+			    >
+			        {/* HEADER */}
+			        <div className="flex justify-between items-center mb-1">
+				    <span className="font-semibold text-black">
+				        {log.gesture}
+				    </span>
+
+				    <span className="text-xs text-gray-500">
+				        {new Date(log.timestamp).toLocaleTimeString()}
+				    </span>
+			        </div>
+
+			        {/* CONFIDENCE */}
+			        <div className="text-sm text-gray-600 mb-1">
+				    Confidence:{" "}
+				    {log.confidence
+				        ? log.confidence.toFixed(2)
+				        : "-"}
+			        </div>
+
+			        {/* ACTIONS */}
+			        {log.actions?.length > 0 && (
+				    <div className="text-sm text-purple-600 font-medium mb-1">
+				        {log.actions.map((a, i) => (
+					    <div key={i}>
+					        -> {a.action} {a.value ?? ""}
+					    </div>
+				        ))}
+				    </div>
+			        )}
+
+			        {/* STATUS */}
+			        <div
+				    className={`text-xs font-medium ${
+				        log.status === "processing"
+					    ? "text-yellow-500"
+					    : "text-green-600"
+				    }`}
+			        >
+				    {log.status}
+			        </div>
+			    </div>
+		        ))}
+		    </div>
+	        )}
+	    </div>
         </div>
+    </div>
     );
 }

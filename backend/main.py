@@ -14,6 +14,7 @@ import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from datetime import datetime, timedelta, timezone
+from ws_manager import ConnectionManager
 
 load_dotenv()
 
@@ -93,14 +94,21 @@ async def lifespan(app: FastAPI):
     app.state.gesture_mapping_lock = Lock()
     gesture.refresh_gesture_mapping_cache(app, supabase)
 
+    # Websocket manager for updating fan and led state to frontend
+    app.state.ws_manager = ConnectionManager()
+    app.state.current_led_state = {
+        "is_on": False,
+        "color": { "name": 'RED', "value": '#FF0000' }
+    }
+    app.state.led_lock = Lock()
+    app.state.current_fan_speed = 0
+    app.state.fan_speed_lock = Lock()
+
     # Set up max action threshold + Lock
     app.state.max_request_counter = 0
     app.state.max_request_lock = Lock()
     app.state.max_limit = 25
     app.state.cooldown_until = None
-    
-    app.state.current_fan_speed = 50
-    app.state.fan_speed_lock = Lock()
 
     # A dedicated thread that constantly checking on the threshold and reset it
     threading.Thread(target=check_to_reset, args = (app,), daemon=True).start()
@@ -188,6 +196,27 @@ async def health_check():
 #             # Optionally send messages back
 #         except:
 #             break
+
+@app.websocket("/ws/device")
+async def device_ws(websocket: WebSocket):
+    manager = websocket.app.state.ws_manager
+    await manager.connect(websocket)
+
+    try:
+        # Send initial state immediately
+        #await websocket.send_json({
+        #    "type": "init",
+        #    "fan": {
+        #        "speed": websocket.app.state.current_fan_speed,
+        #    },
+        #    "light": websocket.app.state.current_led_state
+        #})
+
+        while True:
+            await websocket.receive_text()  # keep connection alive
+
+    except:
+        manager.disconnect(websocket)
 
 # ✅ Start FastAPI
 if __name__ == "__main__":

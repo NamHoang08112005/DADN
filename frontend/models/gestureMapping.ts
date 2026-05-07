@@ -16,6 +16,20 @@ export interface Mapping {
   created_at?: string; // new field
 }
 
+// Used for logging detected frontend
+export interface GestureAction {
+    action_type: string;
+    action_value?: string | number | boolean | null;
+}
+
+export interface GestureLog {
+    gesture: string;
+    confidence?: number;
+    actions?: GestureAction[];
+    timestamp: string;
+    status: 'processing' | 'executed';
+}
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
