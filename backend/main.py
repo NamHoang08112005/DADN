@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
-from routers import fan, light, sensor, login, activitylog
+from routers import fan, light, sensor, login, activitylog, fall_detection
 from contextlib import asynccontextmanager
 from adafruitConnection import run_mqtt_thread
 import os
@@ -96,6 +96,9 @@ async def lifespan(app: FastAPI):
     # A dedicated thread that constantly checking on the threshold and reset it
     threading.Thread(target=check_to_reset, args = (app,), daemon=True).start()
 
+    # Start the Fall Detection background loop
+    threading.Thread(target=fall_detection.fall_detection_loop, daemon=True).start()
+
     yield  # Yield to let FastAPI start the app
 
     # No clean up needed
@@ -130,6 +133,7 @@ app.include_router(light.router)
 app.include_router(sensor.router)
 app.include_router(login.router)
 app.include_router(activitylog.router)
+app.include_router(fall_detection.router)
 
 @app.get("/")
 async def root():

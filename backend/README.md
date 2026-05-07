@@ -8,6 +8,7 @@ The backend of the Smart Home project is built using FastAPI and Python. It prov
 - Real-time device control (fan, light)
 - Integration with Adafruit IO for IoT device management
 - Supabase database integration for user authentication and activity logs
+- Camera-based fall detection with YOLOv8 pose tracking, MJPEG streams, snapshots, and WebSocket alerts
 - CORS support for frontend communication
 
 ## Tech Stack
@@ -16,6 +17,7 @@ The backend of the Smart Home project is built using FastAPI and Python. It prov
 - **Database**: Supabase (Postgres)
 - **IoT Platform**: Adafruit IO
 - **MQTT Client**: Adafruit MQTT Client
+- **Computer Vision**: OpenCV, Ultralytics YOLOv8, PyTorch
 
 ## Project Structure
 ```
@@ -27,9 +29,23 @@ backend/
 │   ├── fan.py             # Fan control routes
 │   ├── light.py           # Light control routes
 │   ├── sensor.py          # Sensor data routes
-│   └── login.py           # Authentication routes
+│   ├── login.py           # Authentication routes
+│   └── fall_detection.py  # Fall detection stream, snapshot, and WebSocket routes
+├── services/
+│   └── fall_detection/    # YOLOv8 pose model, detector, PID helpers, and tuning config
 └── ...
 ```
+
+## Camera-Based Fall Detection
+The fall detection pipeline is integrated directly into the FastAPI backend. During application startup, `main.py` starts `fall_detection.fall_detection_loop()` in a background thread. That loop opens the configured camera, stores raw frames for camera reuse flows, runs YOLOv8 pose tracking, evaluates fall heuristics, and keeps the latest annotated JPEG frame ready for streaming.
+
+Available backend endpoints:
+
+- `GET /fall-detection/stream` returns the annotated MJPEG stream.
+- `GET /fall-detection/raw-stream` returns the raw camera MJPEG stream.
+- `GET /fall-detection/snapshot` returns one raw JPEG frame for FaceID fallback capture.
+- `WS /fall-detection/ws` sends `fall_alert` messages to connected frontend clients.
+
 
 ## Getting Started
 

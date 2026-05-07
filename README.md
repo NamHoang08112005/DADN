@@ -29,6 +29,11 @@ In this project, we develop **Yolo:Home**, a smart home platform that combines c
 - 😊 Facial recognition for personalized access control.
 - 🔥 Fire detection using computer vision techniques for real-time hazard detection.
 - 🌐 A dedicated web application for centralized monitoring and remote control.
+- Camera-based fall detection using YOLOv8 pose tracking, live streaming, and WebSocket alerts.
+
+### Camera-Based Fall Detection:
+The backend includes an always-on fall detection service under `backend/services/fall_detection`. It opens the configured camera, runs YOLOv8 pose tracking, evaluates posture and motion heuristics, and publishes annotated frames through `/fall-detection/stream`. When a fall is confirmed, the `/fall-detection/ws` WebSocket sends alerts to the frontend Capture page, where users can view the live stream and alert logs.
+
 
 ### 🛠️ Technical Innovation:
 A key innovation in this project is the **event-driven programming approach for the Yolo:Bit microcontroller**. Instead of using traditional sequential programming, the system leverages **MicroPython-based event-driven architecture**, enabling dynamic response to real-time events. This enhances flexibility and scalability for future feature development.

@@ -6,6 +6,8 @@ import Link from 'next/link';
 import useAuth from '../../hooks/useAuth';
 import { useRouter } from 'next/navigation';
 
+const API_BASE_URL = 'http://127.0.0.1:8000';
+
 export default function LoginPage() {
   const { signInWithUser } = useAuth();
   const router = useRouter();
@@ -15,6 +17,7 @@ export default function LoginPage() {
   const [faceLoading, setFaceLoading] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [cameraSource, setCameraSource] = useState<'browser' | 'backend' | null>(null);
   const [rememberFaceLogin, setRememberFaceLogin] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -63,11 +66,15 @@ export default function LoginPage() {
         videoRef.current.srcObject = stream;
       }
       streamRef.current = stream;
+      setCameraSource('browser');
       setCameraReady(true);
       setVideoReady(false);
       setCameraNotice('Camera is ready for Face ID login.');
     } catch {
-      setFaceError('Cannot access camera. Please allow camera permission.');
+      setCameraSource('backend');
+      setCameraReady(true);
+      setVideoReady(true);
+      setCameraNotice('Browser camera is unavailable. Using the backend camera for Face ID login.');
     }
   };
 
@@ -82,9 +89,20 @@ export default function LoginPage() {
     }
     setCameraReady(false);
     setVideoReady(false);
+    setCameraSource(null);
   };
 
   const captureFrame = async (): Promise<Blob> => {
+    if (cameraSource === 'backend') {
+      const response = await fetch(`${API_BASE_URL}/fall-detection/snapshot?ts=${Date.now()}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.detail || 'Backend camera frame is not ready');
+      }
+
+      return response.blob();
+    }
+
     const video = videoRef.current;
     if (!video) {
       throw new Error('Camera is not initialized');
@@ -172,7 +190,19 @@ export default function LoginPage() {
         <div className="rounded-lg border border-gray-200 p-4 space-y-3">
           <h3 className="text-sm font-semibold text-gray-800">Sign In with Face ID</h3>
           <div className="relative aspect-video bg-black rounded overflow-hidden">
-            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+            {cameraSource === 'backend' && (
+              <img
+                src={`${API_BASE_URL}/fall-detection/raw-stream`}
+                alt="Raw camera preview"
+                className="w-full h-full object-contain"
+              />
+            )}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className={`w-full h-full object-contain ${cameraSource === 'backend' ? 'hidden' : ''}`}
+            />
           </div>
 
           <div className="flex gap-2">

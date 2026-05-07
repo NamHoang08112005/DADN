@@ -60,6 +60,7 @@ const FireDetection = () => {
     const [faceMessage, setFaceMessage] = useState('');
     const [savedUserId, setSavedUserId] = useState<string | number | null>(null);
     const [authCameraReady, setAuthCameraReady] = useState(false);
+    const [authCameraSource, setAuthCameraSource] = useState<'browser' | 'backend' | null>(null);
     const [authLoading, setAuthLoading] = useState(false);
     const authVideoRef = useRef<HTMLVideoElement>(null);
     const authCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -75,6 +76,10 @@ const FireDetection = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [detections, setDetections] = useState<any[]>([]);
     const videoRef = useRef<HTMLVideoElement>(null);
+
+    // Fall Detection State
+    const [fallLogs, setFallLogs] = useState<{time: string, message: string}[]>([]);
+    const [isFallStreamVisible, setIsFallStreamVisible] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const detectionStreamRef = useRef<FireDetectionStream | null>(null);
@@ -152,12 +157,15 @@ const FireDetection = () => {
             if (authVideoRef.current) {
                 authVideoRef.current.srcObject = stream;
                 authStreamRef.current = stream;
+                setAuthCameraSource('browser');
                 setAuthCameraReady(true);
                 setFaceMessage('Camera ready. Capture a frame to save FaceID data.');
             }
         } catch (error) {
             console.error('Error accessing camera for face enroll:', error);
-            setFaceMessage('Cannot access camera. Please allow camera permission first.');
+            setAuthCameraSource('backend');
+            setAuthCameraReady(true);
+            setFaceMessage('Browser camera is unavailable. Using the backend fall-detection camera for FaceID capture.');
         }
     };
 
@@ -172,13 +180,10 @@ const FireDetection = () => {
         }
 
         setAuthCameraReady(false);
+        setAuthCameraSource(null);
     };
 
     const captureAndSaveFaceId = async () => {
-        if (!authVideoRef.current || !authCanvasRef.current) {
-            return;
-        }
-
         if (activeUserId == null) {
             setFaceMessage('Khong tim thay user hien tai. Vui long dang nhap lai.');
             return;
@@ -188,24 +193,39 @@ const FireDetection = () => {
         setFaceMessage('Dang trich xuat dac trung va luu FaceID...');
 
         try {
-            const video = authVideoRef.current;
-            const canvas = authCanvasRef.current;
-            const width = video.videoWidth || 640;
-            const height = video.videoHeight || 480;
+            let blob: Blob | null = null;
 
-            canvas.width = width;
-            canvas.height = height;
+            if (authCameraSource === 'backend') {
+                const snapshotResponse = await fetch(`${API_BASE_URL}/fall-detection/snapshot?ts=${Date.now()}`);
+                if (!snapshotResponse.ok) {
+                    const payload = await snapshotResponse.json().catch(() => null);
+                    throw new Error(payload?.detail || 'Backend camera frame is not ready');
+                }
+                blob = await snapshotResponse.blob();
+            } else {
+                if (!authVideoRef.current || !authCanvasRef.current) {
+                    throw new Error('Camera is not ready');
+                }
 
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                throw new Error('Cannot read canvas context');
+                const video = authVideoRef.current;
+                const canvas = authCanvasRef.current;
+                const width = video.videoWidth || 640;
+                const height = video.videoHeight || 480;
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    throw new Error('Cannot read canvas context');
+                }
+
+                ctx.drawImage(video, 0, 0, width, height);
+
+                blob = await new Promise<Blob | null>((resolve) => {
+                    canvas.toBlob((frameBlob) => resolve(frameBlob), 'image/jpeg', 0.92);
+                });
             }
-
-            ctx.drawImage(video, 0, 0, width, height);
-
-            const blob = await new Promise<Blob | null>((resolve) => {
-                canvas.toBlob((frameBlob) => resolve(frameBlob), 'image/jpeg', 0.92);
-            });
 
             if (!blob) {
                 throw new Error('Failed to capture frame');
@@ -414,6 +434,36 @@ const FireDetection = () => {
         };
     }, []);
 
+    // Fall Detection WebSocket
+    useEffect(() => {
+        let ws: WebSocket;
+        try {
+            // Convert http:// to ws://
+            const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + '/fall-detection/ws';
+            ws = new WebSocket(wsUrl);
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'fall_alert') {
+                        setFallLogs((prev) => [...prev, { time: new Date().toLocaleTimeString(), message: data.message }]);
+                    }
+                } catch (e) {
+                    console.error("Error parsing WS message", e);
+                }
+            };
+            ws.onerror = (error) => {
+                console.error("WebSocket error", error);
+            };
+        } catch (error) {
+            console.error("WebSocket connection error", error);
+        }
+        return () => {
+            if (ws) {
+                ws.close();
+            }
+        };
+    }, []);
+
     return (
         <div className="flex min-h-screen bg-gray-100">
             <Sidebar />
@@ -435,11 +485,18 @@ const FireDetection = () => {
                             {!isFaceIdAdded && (
                                 <div className="space-y-3">
                                     <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                                        {authCameraSource === 'backend' && (
+                                            <img
+                                                src={`${API_BASE_URL}/fall-detection/raw-stream`}
+                                                alt="Raw camera preview"
+                                                className="w-full h-full object-contain"
+                                            />
+                                        )}
                                         <video
                                             ref={authVideoRef}
                                             autoPlay
                                             playsInline
-                                            className="w-full h-full object-contain"
+                                            className={`w-full h-full object-contain ${authCameraSource === 'backend' ? 'hidden' : ''}`}
                                         />
                                         <canvas ref={authCanvasRef} className="hidden" />
                                     </div>
@@ -593,6 +650,45 @@ const FireDetection = () => {
                             </div>
                         </div>
                     )}
+
+                    <h2 className="text-xl font-semibold mt-8 mb-4 text-gray-800">Fall Detection (Always On)</h2>
+                    <div className="bg-white p-6 rounded-lg shadow-md flex flex-col md:flex-row gap-6 mb-8">
+                        <div className="flex-1">
+                            <h3 className="text-lg font-semibold mb-2">Live Stream</h3>
+                            {isFallStreamVisible ? (
+                                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-gray-300">
+                                    <img src={`${API_BASE_URL}/fall-detection/stream`} alt="Fall Detection Stream" className="w-full h-full object-contain" />
+                                </div>
+                            ) : (
+                                <div className="aspect-video bg-gray-100 rounded-lg border border-gray-300 flex items-center justify-center">
+                                    <p className="text-gray-500">Stream is hidden to save bandwidth.</p>
+                                </div>
+                            )}
+                            <button 
+                                onClick={() => setIsFallStreamVisible(!isFallStreamVisible)}
+                                className={`mt-4 px-4 py-2 rounded text-white ${isFallStreamVisible ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+                            >
+                                {isFallStreamVisible ? 'Hide Stream' : 'View Live Stream'}
+                            </button>
+                        </div>
+                        <div className="w-full md:w-1/3 flex flex-col">
+                            <h3 className="text-lg font-semibold mb-2">Alert Logs</h3>
+                            <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-y-auto min-h-[200px] max-h-[400px]">
+                                {fallLogs.length === 0 ? (
+                                    <p className="text-gray-400 text-sm italic">No falls detected yet...</p>
+                                ) : (
+                                    <ul className="space-y-2 flex flex-col-reverse">
+                                        {[...fallLogs].reverse().map((log, index) => (
+                                            <li key={index} className="text-sm bg-red-100 text-red-800 p-2 rounded border border-red-200 shadow-sm flex items-start gap-2 animate-pulse">
+                                                <span className="font-bold whitespace-nowrap">[{log.time}]</span>
+                                                <span>{log.message}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
