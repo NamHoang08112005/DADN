@@ -38,6 +38,8 @@ def get_mqtt():
 
 #### API section
 latest_temp = None
+latest_fan_speed = None
+latest_led = None
 
 #### Ada Fruit Connection Section
 def connected(client):
@@ -54,6 +56,10 @@ def message(client, feed_id, payload):
     print(f"Received: {feed_id} = {payload}")
     if feed_id == AIO_FEED_IDS[5]:
         latest_temp = payload  # Store latest temperature
+    elif feed_id == AIO_FEED_IDS[1]:
+        latest_fan_speed = payload
+    elif feed_id == AIO_FEED_IDS[4]:
+        latest_led = payload
 
 def publish_random_data(client, id):
     value = random.randint(0, 100)  # Generate a random value

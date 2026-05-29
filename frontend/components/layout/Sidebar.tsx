@@ -15,6 +15,7 @@ import {
   TemperatureIcon,
   HumidityIcon,
   LightIntensityIcon,
+  GestureIcon
 } from '../ui/Icons';
 
 const Sidebar: React.FC = () => {
@@ -88,6 +89,10 @@ const Sidebar: React.FC = () => {
 
         <Link href="/fire-detection" className={getLinkClass('/fire-detection')}>
           <CameraIcon />
+        </Link>
+
+        <Link href="/gesture-to-iot" className={getLinkClass('/gesture-to-iot')}>
+          <GestureIcon />
         </Link>
 
         <Link href="/sensors" className={getLinkClass('/sensors')}>

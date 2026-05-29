@@ -38,3 +38,18 @@ class ColorCode(str, Enum):
 
 class Color(BaseModel):
      code : ColorCode
+
+
+# Pydantic model for gesture to IoT functionality
+class GestureMappingCreate(BaseModel):
+    gesture_name: str = Field(..., min_length=1)
+    action_type: str = Field(..., min_length=1)
+    action_value: Optional[int] = None
+    is_active: bool = True
+
+class GestureMappingUpdate(BaseModel):
+    id: str
+    gesture_name: Optional[str] = None
+    action_type: Optional[str] = None
+    action_value: Optional[int] = None
+    is_active: Optional[bool] = None

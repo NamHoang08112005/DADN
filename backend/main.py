@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
-from routers import fan, light, sensor, login, activitylog, fall_detection
+from routers import fan, light, sensor, login, activitylog, fall_detection, gesture
 from contextlib import asynccontextmanager
 from adafruitConnection import run_mqtt_thread
 import os
@@ -14,6 +14,7 @@ import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from datetime import datetime, timedelta, timezone
+from ws_manager import ConnectionManager
 
 load_dotenv()
 
@@ -87,6 +88,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Could not preload user vectors into RAM: {e}")
 
+    # Keep gesture mappings in RAM for fast gesture mapping
+    app.state.gesture_mapping_cache = {}
+    app.state.gesture_mapping_loaded_at = None
+    app.state.gesture_mapping_lock = Lock()
+    gesture.refresh_gesture_mapping_cache(app, supabase)
+
+    # Websocket manager for updating fan and led state to frontend
+    app.state.ws_manager = ConnectionManager()
+    app.state.current_led_state = {
+        "is_on": False,
+        "color": { "name": 'RED', "value": '#FF0000' }
+    }
+    app.state.led_lock = Lock()
+    app.state.current_fan_speed = 0
+    app.state.fan_speed_lock = Lock()
+
     # Set up max action threshold + Lock
     app.state.max_request_counter = 0
     app.state.max_request_lock = Lock()
@@ -134,6 +151,7 @@ app.include_router(sensor.router)
 app.include_router(login.router)
 app.include_router(activitylog.router)
 app.include_router(fall_detection.router)
+app.include_router(gesture.router)
 
 @app.get("/")
 async def root():
@@ -182,6 +200,27 @@ async def health_check():
 #             # Optionally send messages back
 #         except:
 #             break
+
+@app.websocket("/ws/device")
+async def device_ws(websocket: WebSocket):
+    manager = websocket.app.state.ws_manager
+    await manager.connect(websocket)
+
+    try:
+        # Send initial state immediately
+        #await websocket.send_json({
+        #    "type": "init",
+        #    "fan": {
+        #        "speed": websocket.app.state.current_fan_speed,
+        #    },
+        #    "light": websocket.app.state.current_led_state
+        #})
+
+        while True:
+            await websocket.receive_text()  # keep connection alive
+
+    except:
+        manager.disconnect(websocket)
 
 # ✅ Start FastAPI
 if __name__ == "__main__":

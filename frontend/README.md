@@ -1,14 +1,15 @@
 # Smart Home Frontend
 
 ## Overview
-The frontend of the Smart Home project is built using Next.js, React, and TypeScript. It provides a modern, responsive user interface for monitoring and controlling various aspects of a smart home, including temperature, humidity, light intensity, and fan control.
+The frontend of the Smart Home project is built using Next.js, React, and TypeScript. It provides a modern, responsive user interface for monitoring and controlling various aspects of a smart home, including temperature, humidity, light intensity, rgb led and fan control.
 
 ## Features
 - Real-time monitoring of environmental sensors (temperature, humidity, light)
 - Interactive dashboard with data visualization
-- Device control interface for fans and lights
+- Device control interface for fans and lights (rgb led) with control-by-camera syncronization
 - Responsive design for various screen sizes
 - Time-based data filtering (Day, Week, Month, Year)
+- Gesture-to-IoT feature interface with user-specific configuration (mappings), and loggings (executed gesture-action(s))
 
 ## Tech Stack
 - **Framework**: Next.js 15.3.1
@@ -17,6 +18,7 @@ The frontend of the Smart Home project is built using Next.js, React, and TypeSc
 - **Styling**: Tailwind CSS 4
 - **Charts**: Chart.js 4.4.9, React-Chartjs-2 5.3.0
 - **Icons**: @iconify/react 5.2.1
+- **Real-time Communication**: WebSocket
 
 ## Project Structure
 ```
@@ -97,3 +99,4 @@ The frontend communicates with the backend API at http://localhost:8000. The mai
 - **Light**: `/sensor/light/latest`, `/sensor/light/history1000`
 - **Fan Control**: `/fan/fan/on`, `/fan/fan/off`
 - **Light Control**: `/light/switch/on`, `/light/switch/off`
+- **Gesture-to-IoT**: `/gesture/execute`, `/gesture/gesture-mapping`

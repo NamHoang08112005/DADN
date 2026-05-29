@@ -5,11 +5,12 @@ The backend of the Smart Home project is built using FastAPI and Python. It prov
 
 ## Features
 - RESTful API for sensor data retrieval
-- Real-time device control (fan, light)
+- Real-time device control (fan, light) including direct UI interaction, and indirect surveillence of camera
 - Integration with Adafruit IO for IoT device management
 - Supabase database integration for user authentication and activity logs
 - Camera-based fall detection with YOLOv8 pose tracking, MJPEG streams, snapshots, and WebSocket alerts
 - CORS support for frontend communication
+- - Integrate WebSocket to automatically send fan/light state in frontend
 
 ## Tech Stack
 - **Framework**: FastAPI
@@ -18,6 +19,7 @@ The backend of the Smart Home project is built using FastAPI and Python. It prov
 - **IoT Platform**: Adafruit IO
 - **MQTT Client**: Adafruit MQTT Client
 - **Computer Vision**: OpenCV, Ultralytics YOLOv8, PyTorch
+- **Real-time Communication**: WebSocket
 
 ## Project Structure
 ```

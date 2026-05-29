@@ -4,6 +4,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import Header from '../../components/layout/Header';
 import { FanIcon } from '../../components/ui/Icons';
+import { getSocket, subscribe } from "@/lib/socket";
 
 // API Base URL
 const API_BASE_URL = 'http://127.0.0.1:8000';
@@ -41,6 +42,55 @@ const DeviceControl: React.FC<FanControlProps> = ({
     ];
     
     const [selectedColor, setSelectedColor] = useState(colors[0]); // Default Red
+
+    // ✅ useEffect
+    useEffect(() => {
+        // ensure global socket is created
+        getSocket();
+
+        // subscribe to messages
+        const unsubscribe = subscribe((data) => {
+            if (data.type === "fan_update") {
+                setSpeed(data.speed);
+                setIsFanOn(data.speed > 0);
+            }
+
+            if (data.type === "led_update") {
+                setIsLightOn(data.is_on);
+
+                // ⚠️ careful: backend may not send color
+		// Right now, gesture does not support change color
+		// Thus, ignore this
+                if (data.color) {
+                    setSelectedColor({
+                        name: data.color.name,
+                        value: data.color.value
+                    });
+                }
+            }
+        });
+
+        // cleanup فقط unsubscribe (DO NOT close socket)
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const fetchState = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/activitylog/state`);
+                const data = await res.json();
+
+                setSpeed(data.fan_speed || 0);
+                setIsFanOn(data.fan_speed > 0);
+                setIsLightOn(data.light_on === true);
+                setSelectedColor(data.color);
+            } catch (err) {
+                console.error("Failed to fetch initial state", err);
+            }
+        };
+
+        fetchState();
+    }, []);
     
     // Bật quạt với tốc độ chỉ định
     const turnOnFan = async (fanSpeed: number) => {
